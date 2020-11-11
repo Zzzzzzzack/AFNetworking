@@ -180,11 +180,15 @@ didCompleteWithError:(NSError *)error
     __block id responseObject = nil;
 
     NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
-    userInfo[AFNetworkingTaskDidCompleteResponseSerializerKey] = manager.responseSerializer;
+    if (manager) {
+        userInfo[AFNetworkingTaskDidCompleteResponseSerializerKey] = manager.responseSerializer;
+    } else {
+        userInfo[AFNetworkingTaskDidCompleteResponseSerializerKey] = nil;
+    }
 
     //Performance Improvement from #2672
     NSData *data = nil;
-    if (self.mutableData) {
+    if (self && self.mutableData) {
         data = [self.mutableData copy];
         //We no longer need the reference, so nil it out to gain back some memory.
         self.mutableData = nil;
