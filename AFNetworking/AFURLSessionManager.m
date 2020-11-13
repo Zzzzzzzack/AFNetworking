@@ -175,15 +175,15 @@ static const void * const AuthenticationChallengeErrorKey = &AuthenticationChall
 didCompleteWithError:(NSError *)error
 {
     error = objc_getAssociatedObject(task, AuthenticationChallengeErrorKey) ?: error;
-    __strong AFURLSessionManager *manager = self.manager;
+    __strong AFURLSessionManager *manager = self ? self.manager : nil;
 
     __block id responseObject = nil;
 
     NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
-    if (manager) {
+    if (manager && manager.responseSerializer) {
         userInfo[AFNetworkingTaskDidCompleteResponseSerializerKey] = manager.responseSerializer;
     } else {
-        userInfo[AFNetworkingTaskDidCompleteResponseSerializerKey] = nil;
+        [userInfo removeObjectForKey: AFNetworkingTaskDidCompleteResponseSerializerKey];
     }
 
     //Performance Improvement from #2672
@@ -196,23 +196,26 @@ didCompleteWithError:(NSError *)error
 
 #if AF_CAN_USE_AT_AVAILABLE && AF_CAN_INCLUDE_SESSION_TASK_METRICS
     if (@available(iOS 10, macOS 10.12, watchOS 3, tvOS 10, *)) {
-        if (self.sessionTaskMetrics) {
+        if (self && self.sessionTaskMetrics) {
             userInfo[AFNetworkingTaskDidCompleteSessionTaskMetrics] = self.sessionTaskMetrics;
         }
     }
 #endif
 
-    if (self.downloadFileURL) {
+    if (self && self.downloadFileURL) {
         userInfo[AFNetworkingTaskDidCompleteAssetPathKey] = self.downloadFileURL;
     } else if (data) {
         userInfo[AFNetworkingTaskDidCompleteResponseDataKey] = data;
     }
-
+    
     if (error) {
         userInfo[AFNetworkingTaskDidCompleteErrorKey] = error;
 
-        dispatch_group_async(manager.completionGroup ?: url_session_manager_completion_group(), manager.completionQueue ?: dispatch_get_main_queue(), ^{
-            if (self.completionHandler) {
+        dispatch_group_t completionGroup = (manager && manager.completionGroup) ? manager.completionGroup : nil;
+        dispatch_queue_t completionQueue = (manager && manager.completionQueue) ? manager.completionQueue : nil;
+
+        dispatch_group_async(completionGroup ?: url_session_manager_completion_group(), completionQueue ?: dispatch_get_main_queue(), ^{
+            if (self && self.completionHandler) {
                 self.completionHandler(task.response, responseObject, error);
             }
 
@@ -223,9 +226,11 @@ didCompleteWithError:(NSError *)error
     } else {
         dispatch_async(url_session_manager_processing_queue(), ^{
             NSError *serializationError = nil;
-            responseObject = [manager.responseSerializer responseObjectForResponse:task.response data:data error:&serializationError];
+            if (manager) {
+                responseObject = [manager.responseSerializer responseObjectForResponse:task.response data:data error:&serializationError];
+            }
 
-            if (self.downloadFileURL) {
+            if (self && self.downloadFileURL) {
                 responseObject = self.downloadFileURL;
             }
 
@@ -237,8 +242,11 @@ didCompleteWithError:(NSError *)error
                 userInfo[AFNetworkingTaskDidCompleteErrorKey] = serializationError;
             }
 
-            dispatch_group_async(manager.completionGroup ?: url_session_manager_completion_group(), manager.completionQueue ?: dispatch_get_main_queue(), ^{
-                if (self.completionHandler) {
+            dispatch_group_t completionGroup = (manager && manager.completionGroup) ? manager.completionGroup : nil;
+            dispatch_queue_t completionQueue = (manager && manager.completionQueue) ? manager.completionQueue : nil;
+            
+            dispatch_group_async(completionGroup ?: url_session_manager_completion_group(), completionQueue ?: dispatch_get_main_queue(), ^{
+                if (self && self.completionHandler) {
                     self.completionHandler(task.response, responseObject, serializationError);
                 }
 
