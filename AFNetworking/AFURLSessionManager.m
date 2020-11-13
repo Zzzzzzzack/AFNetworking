@@ -182,8 +182,6 @@ didCompleteWithError:(NSError *)error
     NSMutableDictionary *userInfo = [NSMutableDictionary dictionary];
     if (manager && manager.responseSerializer) {
         userInfo[AFNetworkingTaskDidCompleteResponseSerializerKey] = manager.responseSerializer;
-    } else {
-        [userInfo removeObjectForKey: AFNetworkingTaskDidCompleteResponseSerializerKey];
     }
 
     //Performance Improvement from #2672
